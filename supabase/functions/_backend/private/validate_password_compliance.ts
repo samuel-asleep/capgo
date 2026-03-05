@@ -3,13 +3,11 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { verifyCaptchaToken } from '../utils/captcha.ts'
 import { parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
 import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { emptySupabase, supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
-import { getEnv } from '../utils/utils.ts'
 
 interface ValidatePasswordCompliance {
   email: string
@@ -103,17 +101,6 @@ app.post('/', async (c) => {
   const body = validationResult.data
   const { password: _password, captcha_token: _captchaToken, ...bodyWithoutPassword } = body
   cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance raw body', rawBody: bodyWithoutPassword })
-
-  // Server-side CAPTCHA verification (consistent with other sensitive unauthenticated endpoints).
-  // This prevents automated credential-guessing attacks when CAPTCHA_SECRET_KEY is configured,
-  // providing a second layer of protection alongside IP-based rate limiting.
-  const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
-  if (captchaSecret) {
-    if (!body.captcha_token) {
-      return quickError(400, 'captcha_required', 'Captcha token is required')
-    }
-    await verifyCaptchaToken(c, body.captcha_token, captchaSecret)
-  }
 
   const adminClient = useSupabaseAdmin(c)
 

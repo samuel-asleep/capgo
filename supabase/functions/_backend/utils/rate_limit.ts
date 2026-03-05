@@ -23,31 +23,23 @@ export interface RateLimitStatus {
 
 /**
  * Get the client IP address from the request.
- * Cloudflare Workers provide the real client IP via `cf-connecting-ip`, which cannot be spoofed.
- * For other runtimes (e.g. Supabase Edge Functions) we take the LAST entry in `x-forwarded-for`
- * rather than the first; infrastructure proxies append the upstream IP so the last value is
- * the one added by the most-recently-traversed trusted proxy and is the hardest for a client to
- * forge without knowing what the infrastructure will append.
- * Returns 'unknown' if no IP headers are found – callers treat this as a non-blocking case.
+ * Cloudflare Workers provide the client IP in cf-connecting-ip header.
+ * Returns 'unknown' if no IP headers are found - callers should handle this case.
  */
 export function getClientIP(c: Context): string {
-  // Cloudflare Workers provide the real client IP (set by Cloudflare; cannot be forged by clients)
+  // Cloudflare Workers provide the real client IP
   const cfConnectingIp = c.req.header('cf-connecting-ip')
   if (cfConnectingIp)
     return cfConnectingIp
 
-  // Fallback to x-forwarded-for.
-  // Use the LAST entry (appended by the infrastructure proxy) rather than the first
-  // (which can be prepended by the client with a forged IP address).
+  // Fallback to x-forwarded-for (less reliable but common)
   const forwardedFor = c.req.header('x-forwarded-for')
   if (forwardedFor) {
-    const parts = forwardedFor.split(',')
-    const last = parts[parts.length - 1]?.trim()
-    if (last)
-      return last
+    // Take the first IP in the chain (original client)
+    return forwardedFor.split(',')[0].trim()
   }
 
-  // Fallback to x-real-ip (typically set by nginx/ingress to the real client IP)
+  // Fallback to x-real-ip
   const realIp = c.req.header('x-real-ip')
   if (realIp)
     return realIp
