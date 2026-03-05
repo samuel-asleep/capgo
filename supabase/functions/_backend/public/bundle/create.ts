@@ -15,9 +15,95 @@ interface CreateBundleBody {
   key_id?: string
 }
 
+function isPrivateIPv4(hostname: string): boolean {
+  const parts = hostname.split('.')
+  if (parts.length !== 4)
+    return false
+  const nums = parts.map(Number)
+  if (nums.some(n => !Number.isInteger(n) || n < 0 || n > 255))
+    return false
+  const [a, b] = nums
+  return (
+    a === 127 // 127.0.0.0/8 loopback
+    || (a === 169 && b === 254) // 169.254.0.0/16 link-local (cloud metadata)
+    || a === 10 // 10.0.0.0/8 RFC 1918
+    || (a === 172 && b >= 16 && b <= 31) // 172.16.0.0/12 RFC 1918
+    || (a === 192 && b === 168) // 192.168.0.0/16 RFC 1918
+    || a === 0 // 0.0.0.0/8 unspecified
+    || (a === 100 && b >= 64 && b <= 127) // 100.64.0.0/10 shared address (CGNAT)
+  )
+}
+
+function isPrivateIPv6(hostname: string): boolean {
+  // Strip brackets: [::1] -> ::1
+  const ip = (hostname.startsWith('[') && hostname.endsWith(']')) ? hostname.slice(1, -1) : hostname
+  const lower = ip.toLowerCase()
+  if (lower === '::1' || lower === '::')
+    return true // loopback / unspecified
+  // fc00::/7 unique local (fc and fd prefixes)
+  if (/^f[cd][0-9a-f]{0,2}:/i.test(lower))
+    return true
+  // fe80::/10 link-local (fe80 to febf)
+  const m = /^fe([0-9a-f]{2})/i.exec(lower)
+  if (m) {
+    const octet = Number.parseInt(m[1], 16)
+    if (octet >= 0x80 && octet <= 0xBF)
+      return true
+  }
+  // IPv4-mapped IPv6: ::ffff:192.168.x.x
+  if (lower.startsWith('::ffff:')) {
+    const ipv4Part = lower.slice(7)
+    if (isPrivateIPv4(ipv4Part))
+      return true
+  }
+  return false
+}
+
 function validateUrlFormat(url: string) {
   if (!url.startsWith('https://')) {
     throw simpleError('invalid_protocol', 'External URL must use HTTPS protocol', { external_url: url })
+  }
+
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  }
+  catch {
+    throw simpleError('invalid_url', 'External URL is not a valid URL', { external_url: url })
+  }
+
+  // Reject embedded credentials (user:pass@host)
+  if (parsed.username !== '' || parsed.password !== '') {
+    throw simpleError('invalid_url_credentials', 'External URL must not contain embedded credentials', { external_url: url })
+  }
+
+  const hostname = parsed.hostname.toLowerCase()
+
+  // Reject localhost and known internal/metadata hostnames
+  const blockedHostnames = [
+    'localhost',
+    'metadata.google.internal', // GCP
+    'metadata.azure.com', // Azure
+    'instance-data', // GCP metadata alternative
+    '169.254.169.254', // AWS/GCP/Azure metadata (also caught by isPrivateIPv4)
+    '169.254.170.2', // ECS container metadata
+    '169.254.169.253', // ECS task metadata v3
+  ]
+  if (blockedHostnames.includes(hostname)) {
+    throw simpleError('invalid_hostname', 'External URL must not point to a private or internal address', { external_url: url })
+  }
+
+  // Reject private IPv4 addresses
+  if (isPrivateIPv4(hostname)) {
+    throw simpleError('invalid_hostname', 'External URL must not point to a private or internal address', { external_url: url })
+  }
+
+  // Reject private/reserved IPv6 addresses
+  // An IPv6 address always contains at least two colons or is wrapped in brackets
+  if (hostname.startsWith('[') || hostname.includes(':')) {
+    if (isPrivateIPv6(hostname)) {
+      throw simpleError('invalid_hostname', 'External URL must not point to a private or internal address', { external_url: url })
+    }
   }
 }
 

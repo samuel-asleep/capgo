@@ -142,6 +142,151 @@ describe('[POST] /bundle - Create Bundle with External URL', () => {
     expect(data.error).toBe('invalid_protocol')
   })
 
+  // SSRF protection tests - ensure private/internal hosts are rejected
+  it.concurrent('should reject AWS metadata endpoint (SSRF protection)', async () => {
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
+        app_id: APPNAME,
+        version: '1.0.0-ssrf-aws',
+        external_url: 'https://169.254.169.254/latest/meta-data/', // AWS instance metadata
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('invalid_hostname')
+  })
+
+  it.concurrent('should reject localhost (SSRF protection)', async () => {
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
+        app_id: APPNAME,
+        version: '1.0.0-ssrf-localhost',
+        external_url: 'https://localhost/bundle.zip',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('invalid_hostname')
+  })
+
+  it.concurrent('should reject loopback IPv4 (SSRF protection)', async () => {
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
+        app_id: APPNAME,
+        version: '1.0.0-ssrf-loopback',
+        external_url: 'https://127.0.0.1/bundle.zip',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('invalid_hostname')
+  })
+
+  it.concurrent('should reject RFC 1918 private IPv4 10.x (SSRF protection)', async () => {
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
+        app_id: APPNAME,
+        version: '1.0.0-ssrf-10x',
+        external_url: 'https://10.0.0.1/bundle.zip',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('invalid_hostname')
+  })
+
+  it.concurrent('should reject RFC 1918 private IPv4 192.168.x (SSRF protection)', async () => {
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
+        app_id: APPNAME,
+        version: '1.0.0-ssrf-192168',
+        external_url: 'https://192.168.1.1/bundle.zip',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('invalid_hostname')
+  })
+
+  it.concurrent('should reject RFC 1918 private IPv4 172.16.x (SSRF protection)', async () => {
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
+        app_id: APPNAME,
+        version: '1.0.0-ssrf-172',
+        external_url: 'https://172.16.0.1/bundle.zip',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('invalid_hostname')
+  })
+
+  it.concurrent('should reject GCP metadata endpoint (SSRF protection)', async () => {
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
+        app_id: APPNAME,
+        version: '1.0.0-ssrf-gcp',
+        external_url: 'https://metadata.google.internal/computeMetadata/v1/',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('invalid_hostname')
+  })
+
+  it.concurrent('should reject URL with embedded credentials (SSRF protection)', async () => {
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
+        app_id: APPNAME,
+        version: '1.0.0-ssrf-creds',
+        external_url: 'https://user:password@example.com/bundle.zip',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('invalid_url_credentials')
+  })
+
+  it.concurrent('should reject IPv6 loopback [::1] (SSRF protection)', async () => {
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
+        app_id: APPNAME,
+        version: '1.0.0-ssrf-ipv6loop',
+        external_url: 'https://[::1]/bundle.zip',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('invalid_hostname')
+  })
+
   it('should return 400 when user cannot access the app', async () => {
     const response = await fetch(`${BASE_URL}/bundle`, {
       method: 'POST',
