@@ -1,1 +1,0 @@
-/home/runner/work/capgo/capgo/supabase/seed.sql
