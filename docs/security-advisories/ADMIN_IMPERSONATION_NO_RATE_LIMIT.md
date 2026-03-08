@@ -15,10 +15,24 @@ The `/private/log_as` endpoint allows admin users to generate JWT tokens for any
 - **Code:**
   ```typescript
   app.post('/', middlewareAuth, async (c) => {
-    // ... validates admin via is_admin() RPC
-    // ... generates magic link and returns JWT
-    // No rate limiting middleware applied
-    return c.json({ jwt, refreshToken })
+    const authToken = c.req.header('authorization')
+    if (!authToken)
+      throw simpleError('not_authorized', 'Not authorized')
+
+    const body = await parseBody<any>(c)
+    const parsedBodyResult = bodySchema.safeParse(body)
+    // ...
+    const supabaseClient = useSupabaseClient(c, authToken)
+    const { data: isAdmin } = await supabaseClient.rpc('is_admin')
+    if (!isAdmin)
+      throw simpleError('not_admin', 'Not admin')
+
+    // Generates magic link and verifies OTP to produce JWT
+    // No rate limiting middleware, no audit logging
+    const { data: magicLink } = await supabaseAdmin.auth.admin.generateLink({ type: 'magiclink', email: userEmail })
+    const { data: authData } = await tmpSupabaseClient.auth.verifyOtp({ token_hash: magicLink.properties.hashed_token, type: 'email' })
+
+    return c.json({ jwt: authData.session?.access_token, refreshToken: authData.session?.refresh_token })
   })
   ```
 

@@ -1,8 +1,10 @@
-# Security Advisories (AI generated)
+# Security Advisories
+
+## Overview (AI generated)
 
 This directory contains documented security vulnerabilities found during an automated security audit of the Capgo codebase. Each vulnerability was **tested and verified** against a local Supabase instance before being documented.
 
-## Test Results Summary
+## Test Results Summary (AI generated)
 
 | # | Vulnerability | Severity | Test Result | File |
 |---|---------------|----------|-------------|------|
@@ -13,7 +15,7 @@ This directory contains documented security vulnerabilities found during an auto
 | 5 | [Stack Trace in Production Logs](./STACK_TRACE_IN_PRODUCTION_LOGS.md) | Low | 🔴 Confirmed | `utils/logging.ts:19` |
 | 6 | [localStorage JWT Storage](./LOCALSTORAGE_JWT_STORAGE.md) | Low | 🔴 Confirmed | `src/services/supabase.ts:92` |
 
-## Verified as Safe
+## Verified as Safe (AI generated)
 
 The following areas were tested and found to be properly secured:
 
@@ -28,7 +30,7 @@ The following areas were tested and found to be properly secured:
 | Stripe Webhook Verification | Signature verification present | ✅ Safe |
 | Timing-Safe API Secret Comparison | Uses `timingSafeEqual` from hono | ✅ Safe |
 
-## How Tests Were Performed
+## How Tests Were Performed (AI generated)
 
 All vulnerabilities were verified against a running local Supabase instance:
 
@@ -42,6 +44,6 @@ Test accounts used:
 - `test@capgo.app` (regular user)
 - `admin@capgo.app` (admin user)
 
-## Disclosure
+## Disclosure (AI generated)
 
 These findings follow the [Capgo Bug Bounty](https://capgo.app/bug-bounty/) program guidelines. Each advisory includes exact file paths, line numbers, and reproducible proof of concept.

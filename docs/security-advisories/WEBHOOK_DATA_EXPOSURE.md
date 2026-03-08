@@ -14,20 +14,20 @@ Webhook payloads include raw `old_record` and `new_record` database objects with
 - **Lines:** 17–18, 30–31, 105–106
 - **Code:**
   ```typescript
-  // WebhookPayload interface (lines 17-18)
+  // From WebhookPayload interface (lines 17-18)
   export interface WebhookPayload {
     // ...
     data: {
       table: string
       operation: string
       record_id: string
-      old_record: any | null   // Unfiltered raw database record
-      new_record: any | null   // Unfiltered raw database record
+      old_record: any | null
+      new_record: any | null
       changed_fields: string[] | null
     }
   }
 
-  // Data assembly (lines 105-106)
+  // From payload assembly (lines 105-106)
   old_record: auditLogData.old_record,
   new_record: auditLogData.new_record,
   ```
